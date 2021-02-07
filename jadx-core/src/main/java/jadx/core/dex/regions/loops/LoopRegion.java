@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.jetbrains.annotations.Nullable;
+
 import jadx.core.dex.attributes.nodes.LoopInfo;
 import jadx.core.dex.instructions.IfNode;
 import jadx.core.dex.instructions.args.RegisterArg;
@@ -13,7 +15,7 @@ import jadx.core.dex.nodes.IRegion;
 import jadx.core.dex.nodes.InsnNode;
 import jadx.core.dex.regions.AbstractRegion;
 import jadx.core.dex.regions.conditions.IfCondition;
-import org.jetbrains.annotations.Nullable;
+import jadx.core.utils.BlockUtils;
 
 public final class LoopRegion extends AbstractRegion {
 
@@ -75,7 +77,7 @@ public final class LoopRegion extends AbstractRegion {
 	}
 
 	private IfNode getIfInsn() {
-		return (IfNode) conditionBlock.getInstructions().get(0);
+		return (IfNode) BlockUtils.getLastInsn(conditionBlock);
 	}
 
 	/**
@@ -100,12 +102,12 @@ public final class LoopRegion extends AbstractRegion {
 			boolean found = false;
 			// search result arg in other insns
 			for (int j = i + 1; j < size; j++) {
-				if (insns.get(i).containsArg(res)) {
+				if (insns.get(i).containsVar(res)) {
 					found = true;
 				}
 			}
 			// or in if insn
-			if (!found && ifInsn.containsArg(res)) {
+			if (!found && ifInsn.containsVar(res)) {
 				found = true;
 			}
 			if (!found) {
@@ -131,13 +133,8 @@ public final class LoopRegion extends AbstractRegion {
 	}
 
 	public int getConditionSourceLine() {
-		if (conditionBlock != null) {
-			List<InsnNode> condInsns = conditionBlock.getInstructions();
-			if (!condInsns.isEmpty()) {
-				return condInsns.get(0).getSourceLine();
-			}
-		}
-		return 0;
+		InsnNode lastInsn = BlockUtils.getLastInsn(conditionBlock);
+		return lastInsn == null ? 0 : lastInsn.getSourceLine();
 	}
 
 	public LoopType getType() {

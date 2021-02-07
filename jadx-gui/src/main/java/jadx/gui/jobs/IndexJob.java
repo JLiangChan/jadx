@@ -12,8 +12,8 @@ import jadx.gui.JadxWrapper;
 import jadx.gui.utils.CacheObject;
 import jadx.gui.utils.CodeLinesInfo;
 import jadx.gui.utils.CodeUsageInfo;
-import jadx.gui.utils.JNodeCache;
-import jadx.gui.utils.Utils;
+import jadx.gui.utils.NLS;
+import jadx.gui.utils.UiUtils;
 import jadx.gui.utils.search.StringRef;
 import jadx.gui.utils.search.TextSearchIndex;
 
@@ -27,38 +27,56 @@ public class IndexJob extends BackgroundJob {
 		this.cache = cache;
 	}
 
+	@Override
 	protected void runJob() {
-		JNodeCache nodeCache = cache.getNodeCache();
-		final TextSearchIndex index = new TextSearchIndex(nodeCache);
-		final CodeUsageInfo usageInfo = new CodeUsageInfo(nodeCache);
+		TextSearchIndex index = new TextSearchIndex(cache);
+		CodeUsageInfo usageInfo = new CodeUsageInfo(cache.getNodeCache());
+
 		cache.setTextIndex(index);
 		cache.setUsageInfo(usageInfo);
-		for (final JavaClass cls : wrapper.getClasses()) {
-			addTask(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						index.indexNames(cls);
-
-						CodeLinesInfo linesInfo = new CodeLinesInfo(cls);
-						List<StringRef> lines = splitLines(cls);
-
-						usageInfo.processClass(cls, linesInfo, lines);
-						if (Utils.isFreeMemoryAvailable()) {
-							index.indexCode(cls, linesInfo, lines);
-						} else {
-							index.classCodeIndexSkipped(cls);
-						}
-					} catch (Exception e) {
-						LOG.error("Index error in class: {}", cls.getFullName(), e);
-					}
-				}
-			});
+		addTask(index::indexResource);
+		for (final JavaClass cls : wrapper.getIncludedClasses()) {
+			addTask(() -> indexCls(cache, cls));
 		}
 	}
 
+	public static void indexCls(CacheObject cache, JavaClass cls) {
+		try {
+			TextSearchIndex index = cache.getTextIndex();
+			CodeUsageInfo usageInfo = cache.getUsageInfo();
+			if (index == null || usageInfo == null) {
+				return;
+			}
+
+			index.indexNames(cls);
+
+			CodeLinesInfo linesInfo = new CodeLinesInfo(cls);
+			List<StringRef> lines = splitLines(cls);
+
+			usageInfo.processClass(cls, linesInfo, lines);
+			if (UiUtils.isFreeMemoryAvailable()) {
+				index.indexCode(cls, linesInfo, lines);
+			} else {
+				index.classCodeIndexSkipped(cls);
+			}
+		} catch (Exception e) {
+			LOG.error("Index error in class: {}", cls.getFullName(), e);
+		}
+	}
+
+	public static void refreshIndex(CacheObject cache, JavaClass cls) {
+		TextSearchIndex index = cache.getTextIndex();
+		CodeUsageInfo usageInfo = cache.getUsageInfo();
+		if (index == null || usageInfo == null) {
+			return;
+		}
+		index.remove(cls);
+		usageInfo.remove(cls);
+		indexCls(cache, cls);
+	}
+
 	@NotNull
-	protected List<StringRef> splitLines(JavaClass cls) {
+	protected static List<StringRef> splitLines(JavaClass cls) {
 		List<StringRef> lines = StringRef.split(cls.getCode(), CodeWriter.NL);
 		int size = lines.size();
 		for (int i = 0; i < size; i++) {
@@ -69,6 +87,6 @@ public class IndexJob extends BackgroundJob {
 
 	@Override
 	public String getInfoString() {
-		return "Indexing: ";
+		return NLS.str("progress.index") + "… ";
 	}
 }

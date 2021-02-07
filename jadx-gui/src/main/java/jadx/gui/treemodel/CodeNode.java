@@ -12,12 +12,14 @@ public class CodeNode extends JNode {
 	private final transient JNode jNode;
 	private final transient JClass jParent;
 	private final transient StringRef line;
-	private final int lineNum;
+	private final transient int lineNum;
+	private transient int pos = -1;
+	private transient boolean precise;
 
-	public CodeNode(JNode jNode, int lineNum, StringRef line) {
+	public CodeNode(JNode jNode, int lineNum, StringRef lineStr) {
 		this.jNode = jNode;
 		this.jParent = this.jNode.getJParent();
-		this.line = line;
+		this.line = lineStr;
 		this.lineNum = lineNum;
 	}
 
@@ -48,6 +50,10 @@ public class CodeNode extends JNode {
 		return null;
 	}
 
+	public StringRef getLineStr() {
+		return line;
+	}
+
 	@Override
 	public int getLine() {
 		return lineNum;
@@ -71,5 +77,43 @@ public class CodeNode extends JNode {
 	@Override
 	public String makeLongString() {
 		return makeString();
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) {
+			return true;
+		}
+		if (!(o instanceof CodeNode)) {
+			return false;
+		}
+		CodeNode codeNode = (CodeNode) o;
+		return jNode.equals(codeNode.jNode);
+	}
+
+	@Override
+	public int hashCode() {
+		return jNode.hashCode();
+	}
+
+	public int getPos() {
+		return pos;
+	}
+
+	public CodeNode setPos(int pos) {
+		this.pos = pos;
+		return this;
+	}
+
+	public CodeNode setPrecisePos(int pos) {
+		this.pos = pos;
+		if (pos > -1) {
+			this.precise = true;
+		}
+		return this;
+	}
+
+	public boolean isPrecisePos() {
+		return precise;
 	}
 }

@@ -1,7 +1,5 @@
 package jadx.core.xmlgen.entry;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -13,13 +11,13 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jadx.core.utils.android.TextResMapFile;
+import jadx.core.utils.exceptions.JadxRuntimeException;
 import jadx.core.xmlgen.ParserConstants;
-import jadx.core.xmlgen.ResTableParser;
 
 public class ValuesParser extends ParserConstants {
 	private static final Logger LOG = LoggerFactory.getLogger(ValuesParser.class);
 
-	private static String[] androidStrings;
 	private static Map<Integer, String> androidResMap;
 
 	private final String[] strings;
@@ -28,22 +26,31 @@ public class ValuesParser extends ParserConstants {
 	public ValuesParser(String[] strings, Map<Integer, String> resMap) {
 		this.strings = strings;
 		this.resMap = resMap;
+		getAndroidResMap();
+	}
 
-		if (androidStrings == null && androidResMap == null) {
-			try {
-				decodeAndroid();
-			} catch (Exception e) {
-				LOG.error("Failed to decode Android Resource file", e);
-			}
+	public static Map<Integer, String> getAndroidResMap() {
+		if (androidResMap == null) {
+			androidResMap = loadAndroidResMap();
+		}
+		return androidResMap;
+	}
+
+	private static Map<Integer, String> loadAndroidResMap() {
+		try (InputStream is = ValuesParser.class.getResourceAsStream("/android/res-map.txt")) {
+			return TextResMapFile.read(is);
+		} catch (Exception e) {
+			throw new JadxRuntimeException("Failed to load android resource file", e);
 		}
 	}
 
-	private static void decodeAndroid() throws IOException {
-		InputStream inputStream = new BufferedInputStream(ValuesParser.class.getResourceAsStream("/resources.arsc"));
-		ResTableParser androidParser = new ResTableParser();
-		androidParser.decode(inputStream);
-		androidStrings = androidParser.getStrings();
-		androidResMap = androidParser.getResStorage().getResourcesNames();
+	@Nullable
+	public String getSimpleValueString(ResourceEntry ri) {
+		RawValue simpleValue = ri.getSimpleValue();
+		if (simpleValue == null) {
+			return null;
+		}
+		return decodeValue(simpleValue);
 	}
 
 	@Nullable
@@ -60,7 +67,7 @@ public class ValuesParser extends ParserConstants {
 			if (nameStr == null) {
 				strList.add(valueStr);
 			} else {
-				strList.add(nameStr + "=" + valueStr);
+				strList.add(nameStr + '=' + valueStr);
 			}
 		}
 		return strList.toString();
@@ -98,6 +105,7 @@ public class ValuesParser extends ParserConstants {
 			case TYPE_INT_COLOR_RGB4:
 				return String.format("#%03x", data & 0xFFF);
 
+			case TYPE_DYNAMIC_REFERENCE:
 			case TYPE_REFERENCE: {
 				String ri = resMap.get(data);
 				if (ri == null) {
@@ -110,7 +118,7 @@ public class ValuesParser extends ParserConstants {
 					}
 					return "?unknown_ref: " + Integer.toHexString(data);
 				}
-				return "@" + ri;
+				return '@' + ri;
 			}
 
 			case TYPE_ATTRIBUTE: {
@@ -122,17 +130,20 @@ public class ValuesParser extends ParserConstants {
 					}
 					return "?unknown_attr_ref: " + Integer.toHexString(data);
 				}
-				return "?" + ri;
+				return '?' + ri;
 			}
 
 			case TYPE_DIMENSION:
 				return decodeComplex(data, false);
 			case TYPE_FRACTION:
 				return decodeComplex(data, true);
+			case TYPE_DYNAMIC_ATTRIBUTE:
+				LOG.warn("Data type TYPE_DYNAMIC_ATTRIBUTE not yet supported: {}", data);
+				return "  TYPE_DYNAMIC_ATTRIBUTE: " + data;
 
 			default:
 				LOG.warn("Unknown data type: 0x{} {}", Integer.toHexString(dataType), data);
-				return "  ?0x" + Integer.toHexString(dataType) + " " + data;
+				return "  ?0x" + Integer.toHexString(dataType) + ' ' + data;
 		}
 	}
 
@@ -215,10 +226,6 @@ public class ValuesParser extends ParserConstants {
 	}
 
 	private static String floatToString(float value) {
-		return doubleToString((double) value);
-	}
-
-	public static Map<Integer, String> getAndroidResMap() {
-		return androidResMap;
+		return doubleToString(value);
 	}
 }

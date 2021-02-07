@@ -1,54 +1,56 @@
 package jadx.gui.utils.search;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-public class CodeIndex<T> implements SearchIndex<T> {
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-	private final List<StringRef> keys = new ArrayList<>();
-	private final List<T> values = new ArrayList<>();
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 
-	@Override
-	public void put(String str, T value) {
-		throw new UnsupportedOperationException("CodeIndex.put for string not supported");
-	}
+import jadx.api.JavaClass;
+import jadx.gui.treemodel.CodeNode;
+import jadx.gui.utils.UiUtils;
 
-	@Override
-	public void put(StringRef str, T value) {
-		if (str == null || str.length() == 0) {
-			return;
-		}
-		keys.add(str);
+public class CodeIndex {
+
+	private static final Logger LOG = LoggerFactory.getLogger(CodeIndex.class);
+
+	private final List<CodeNode> values = new ArrayList<>();
+
+	public synchronized void put(CodeNode value) {
 		values.add(value);
 	}
 
-	@Override
-	public boolean isStringRefSupported() {
-		return true;
+	public synchronized void removeForCls(JavaClass cls) {
+		values.removeIf(v -> v.getJavaNode().getTopParentClass().equals(cls));
 	}
 
-	@Override
-	public List<T> getValuesForKeysContaining(String str, boolean caseInsensitive) {
-		int size = size();
-		if (size == 0) {
-			return Collections.emptyList();
-		}
-		if (caseInsensitive) {
-			str = str.toLowerCase();
-		}
-		List<T> results = new ArrayList<>();
-		for (int i = 0; i < size; i++) {
-			StringRef key = keys.get(i);
-			if (key.indexOf(str, caseInsensitive) != -1) {
-				results.add(values.get(i));
+	private boolean isMatched(StringRef key, SearchSettings searchSettings) {
+		return searchSettings.isMatch(key);
+	}
+
+	public Flowable<CodeNode> search(final SearchSettings searchSettings) {
+		return Flowable.create(emitter -> {
+			LOG.debug("Code search started: {} ...", searchSettings.getSearchString());
+			for (CodeNode node : values) {
+				int pos = searchSettings.find(node.getLineStr());
+				node.setPos(pos);
+				if (pos > -1) {
+					emitter.onNext(node);
+				}
+				if (emitter.isCancelled()) {
+					LOG.debug("Code search canceled: {}", searchSettings.getSearchString());
+					return;
+				}
 			}
-		}
-		return results;
+			LOG.debug("Code search complete: {}, memory usage: {}", searchSettings.getSearchString(), UiUtils.memoryInfo());
+			emitter.onComplete();
+		}, BackpressureStrategy.BUFFER);
 	}
 
-	@Override
 	public int size() {
-		return keys.size();
+		return values.size();
 	}
 }

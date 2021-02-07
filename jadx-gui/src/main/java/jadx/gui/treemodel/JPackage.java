@@ -1,48 +1,71 @@
 package jadx.gui.treemodel;
 
-import javax.swing.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
+import javax.swing.*;
 
 import org.jetbrains.annotations.NotNull;
 
-import jadx.api.JavaClass;
 import jadx.api.JavaPackage;
-import jadx.gui.utils.Utils;
+import jadx.core.utils.Utils;
+import jadx.gui.JadxWrapper;
+import jadx.gui.utils.UiUtils;
 
 public class JPackage extends JNode implements Comparable<JPackage> {
 	private static final long serialVersionUID = -4120718634156839804L;
 
-	private static final ImageIcon PACKAGE_ICON = Utils.openIcon("package_obj");
+	private static final ImageIcon PACKAGE_ICON = UiUtils.openIcon("package_obj");
 
+	private String fullName;
 	private String name;
-	private final List<JClass> classes;
-	private final List<JPackage> innerPackages = new ArrayList<>(1);
+	private boolean enabled;
+	private List<JClass> classes;
+	private List<JPackage> innerPackages;
 
-	public JPackage(JavaPackage pkg) {
-		this.name = pkg.getName();
-		List<JavaClass> javaClasses = pkg.getClasses();
-		this.classes = new ArrayList<>(javaClasses.size());
-		for (JavaClass javaClass : javaClasses) {
-			classes.add(new JClass(javaClass));
-		}
+	public JPackage(JavaPackage pkg, JadxWrapper wrapper) {
+		this(pkg.getName(), pkg.getName(),
+				isPkgEnabled(wrapper, pkg.getName()),
+				Utils.collectionMap(pkg.getClasses(), JClass::new),
+				new ArrayList<>());
 		update();
 	}
 
-	public JPackage(String name) {
+	public JPackage(String fullName, JadxWrapper wrapper) {
+		this(fullName, fullName, isPkgEnabled(wrapper, fullName), new ArrayList<>(), new ArrayList<>());
+	}
+
+	public JPackage(String fullName, String name) {
+		this(fullName, name, true, Collections.emptyList(), Collections.emptyList());
+	}
+
+	private JPackage(String fullName, String name, boolean enabled, List<JClass> classes, List<JPackage> innerPackages) {
+		this.fullName = fullName;
 		this.name = name;
-		this.classes = new ArrayList<>(1);
+		this.enabled = enabled;
+		this.classes = classes;
+		this.innerPackages = innerPackages;
+	}
+
+	private static boolean isPkgEnabled(JadxWrapper wrapper, String fullPkgName) {
+		List<String> excludedPackages = wrapper.getExcludedPackages();
+		return excludedPackages.isEmpty()
+				|| excludedPackages.stream().filter(p -> !p.isEmpty())
+						.noneMatch(p -> fullPkgName.equals(p) || fullPkgName.startsWith(p + '.'));
 	}
 
 	public final void update() {
 		removeAllChildren();
-		for (JPackage pkg : innerPackages) {
-			pkg.update();
-			add(pkg);
-		}
-		for (JClass cls : classes) {
-			cls.update();
-			add(cls);
+		if (isEnabled()) {
+			for (JPackage pkg : innerPackages) {
+				pkg.update();
+				add(pkg);
+			}
+			for (JClass cls : classes) {
+				cls.update();
+				add(cls);
+			}
 		}
 	}
 
@@ -51,7 +74,22 @@ public class JPackage extends JNode implements Comparable<JPackage> {
 		return name;
 	}
 
-	public void setName(String name) {
+	@Override
+	public boolean canRename() {
+		return true;
+	}
+
+	public String getFullName() {
+		return fullName;
+	}
+
+	public void updateBothNames(String fullName, String name, JadxWrapper wrapper) {
+		this.fullName = fullName;
+		this.name = name;
+		this.enabled = isPkgEnabled(wrapper, fullName);
+	}
+
+	public void updateName(String name) {
 		this.name = name;
 	}
 
@@ -59,8 +97,16 @@ public class JPackage extends JNode implements Comparable<JPackage> {
 		return innerPackages;
 	}
 
+	public void setInnerPackages(List<JPackage> innerPackages) {
+		this.innerPackages = innerPackages;
+	}
+
 	public List<JClass> getClasses() {
 		return classes;
+	}
+
+	public void setClasses(List<JClass> classes) {
+		this.classes = classes;
 	}
 
 	@Override
@@ -107,5 +153,9 @@ public class JPackage extends JNode implements Comparable<JPackage> {
 	@Override
 	public String makeLongString() {
 		return name;
+	}
+
+	public boolean isEnabled() {
+		return enabled;
 	}
 }

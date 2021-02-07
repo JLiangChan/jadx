@@ -81,9 +81,10 @@ public class ExtDataInput extends DataInputDelegate {
 	 * requested (this is similar to DataInputStream's wrapper).
 	 */
 	@Override
+	@SuppressWarnings("InnerAssignment")
 	public final int skipBytes(int n) throws IOException {
 		int total = 0;
-		int cur = 0;
+		int cur;
 
 		while ((total < n) && ((cur = super.skipBytes(n - total)) > 0)) {
 			total += cur;

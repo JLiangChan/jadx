@@ -1,10 +1,5 @@
 package jadx.core.dex.visitors.regions;
 
-import jadx.core.dex.nodes.BlockNode;
-import jadx.core.dex.nodes.IRegion;
-import jadx.core.dex.nodes.MethodNode;
-import jadx.core.utils.exceptions.JadxOverflowException;
-
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
@@ -13,6 +8,11 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import jadx.core.dex.nodes.BlockNode;
+import jadx.core.dex.nodes.IRegion;
+import jadx.core.dex.nodes.MethodNode;
+import jadx.core.utils.exceptions.JadxOverflowException;
 
 final class RegionStack {
 	private static final Logger LOG = LoggerFactory.getLogger(RegionStack.class);
@@ -34,12 +34,13 @@ final class RegionStack {
 			exits = new HashSet<>(4);
 		}
 
-		private State(State c) {
-			exits = new HashSet<>(c.exits);
+		private State(State c, IRegion region) {
+			this.exits = new HashSet<>(c.exits);
+			this.region = region;
 		}
 
-		public State copy() {
-			return new State(this);
+		public State copyWith(IRegion region) {
+			return new State(this, region);
 		}
 
 		@Override
@@ -64,8 +65,7 @@ final class RegionStack {
 		if (stack.size() > REGIONS_STACK_LIMIT) {
 			throw new JadxOverflowException("Regions stack size limit reached");
 		}
-		curState = curState.copy();
-		curState.region = region;
+		curState = curState.copyWith(region);
 		if (DEBUG) {
 			LOG.debug("Stack push: {}: {}", size(), curState);
 		}

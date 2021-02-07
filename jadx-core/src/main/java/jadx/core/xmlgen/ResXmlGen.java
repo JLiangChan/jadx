@@ -1,20 +1,30 @@
 package jadx.core.xmlgen;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import jadx.api.ICodeInfo;
 import jadx.core.codegen.CodeWriter;
 import jadx.core.utils.StringUtils;
 import jadx.core.xmlgen.entry.RawNamedValue;
 import jadx.core.xmlgen.entry.ResourceEntry;
 import jadx.core.xmlgen.entry.ValuesParser;
 
-import java.util.*;
+import static jadx.core.xmlgen.ParserConstants.PLURALS_MAP;
+import static jadx.core.xmlgen.ParserConstants.TYPE_REFERENCE;
 
 public class ResXmlGen {
 
 	private static final Set<String> SKIP_RES_TYPES = new HashSet<>(Arrays.asList(
 			"layout",
 			"mipmap",
-			"id"
-	));
+			"id"));
 
 	private final ResourceStorage resStorage;
 	private final ValuesParser vp;
@@ -49,8 +59,8 @@ public class ResXmlGen {
 
 			content.decIndent();
 			content.startLine("</resources>");
-			content.finish();
-			files.add(ResContainer.singleFile(fileName, content));
+			ICodeInfo codeInfo = content.finish();
+			files.add(ResContainer.textResource(fileName, codeInfo));
 		}
 		Collections.sort(files);
 		return files;
@@ -76,10 +86,16 @@ public class ResXmlGen {
 				if (formatValue != null) {
 					cw.add("\" format=\"").add(formatValue);
 				}
-				cw.add("\">");
+				cw.add("\"");
 			} else {
-				cw.add("name=\"").add(ri.getKeyName()).add("\">");
+				cw.add("name=\"").add(ri.getKeyName()).add('\"');
 			}
+			if (ri.getParentRef() != 0) {
+				String parent = vp.decodeValue(TYPE_REFERENCE, ri.getParentRef());
+				cw.add(" parent=\"").add(parent).add('\"');
+			}
+			cw.add(">");
+
 			cw.incIndent();
 			for (RawNamedValue value : ri.getNamedValues()) {
 				addItem(cw, itemTag, ri.getTypeName(), value);
@@ -121,7 +137,6 @@ public class ResXmlGen {
 		return s.substring(1);
 	}
 
-
 	private void addItem(CodeWriter cw, String itemTag, String typeName, RawNamedValue value) {
 		String nameStr = vp.decodeNameRef(value.getNameRef());
 		String valueStr = vp.decodeValue(value.getRawValue());
@@ -136,20 +151,29 @@ public class ResXmlGen {
 					if (newVal != null) {
 						valueStr = newVal;
 					}
-				} catch (NumberFormatException ignored) {
+				} catch (NumberFormatException e) {
+					// ignore
 				}
 			}
 		}
-		if (typeName.equals("attr")) {
-			if (nameStr != null) {
-				addSimpleValue(cw, typeName, itemTag, nameStr, valueStr, "");
-			}
-		} else if (typeName.equals("style")) {
-			if (nameStr != null) {
-				addSimpleValue(cw, typeName, itemTag, nameStr, "", valueStr);
-			}
-		} else {
-			addSimpleValue(cw, typeName, itemTag, null, null, valueStr);
+		switch (typeName) {
+			case "attr":
+				if (nameStr != null) {
+					addSimpleValue(cw, typeName, itemTag, nameStr, valueStr, "");
+				}
+				break;
+			case "style":
+				if (nameStr != null) {
+					addSimpleValue(cw, typeName, itemTag, nameStr, "", valueStr);
+				}
+				break;
+			case "plurals":
+				final String quantity = PLURALS_MAP.get(value.getNameRef());
+				addSimpleValue(cw, typeName, itemTag, "quantity", quantity, valueStr);
+				break;
+			default:
+				addSimpleValue(cw, typeName, itemTag, null, null, valueStr);
+				break;
 		}
 	}
 
@@ -165,9 +189,9 @@ public class ResXmlGen {
 		cw.add('<').add(itemTag);
 		if (attrName != null && attrValue != null) {
 			if (typeName.equals("attr")) {
-				cw.add(' ').add("name=\"").add(attrName.replace("id.", "")).add("\" value=\"").add(attrValue).add("\"");
+				cw.add(' ').add("name=\"").add(attrName.replace("id.", "")).add("\" value=\"").add(attrValue).add('"');
 			} else if (typeName.equals("style")) {
-				cw.add(' ').add("name=\"").add(attrName.replace("attr.", "")).add("\"");
+				cw.add(' ').add("name=\"").add(attrName.replace("attr.", "")).add('"');
 			} else {
 				cw.add(' ').add(attrName).add("=\"").add(attrValue).add('"');
 			}
@@ -187,10 +211,10 @@ public class ResXmlGen {
 
 	private String getFileName(ResourceEntry ri) {
 		StringBuilder sb = new StringBuilder();
-		String locale = ri.getConfig().getLocale();
+		String qualifiers = ri.getConfig();
 		sb.append("res/values");
-		if (!locale.isEmpty()) {
-			sb.append('-').append(locale);
+		if (!qualifiers.isEmpty()) {
+			sb.append(qualifiers);
 		}
 		sb.append('/');
 		sb.append(ri.getTypeName());

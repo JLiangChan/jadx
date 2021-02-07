@@ -1,15 +1,19 @@
-ext.jadxClasspath = 'clsp-data/android-5.1.jar'
-
-dependencies {
-    runtime files(jadxClasspath)
-
-    compile files('lib/dx-1.14.jar')
-    compile 'commons-io:commons-io:2.6'
-    compile 'org.ow2.asm:asm:6.0'
-    compile 'org.jetbrains:annotations:15.0'
-    compile 'uk.com.robust-it:cloning:1.9.9'
-
-    testCompile 'org.smali:smali:2.2.2'
-    testCompile 'org.smali:baksmali:2.2.2'
+plugins {
+	id 'java-library'
 }
 
+dependencies {
+	api(project(':jadx-plugins:jadx-plugins-api'))
+
+	implementation 'com.google.code.gson:gson:2.8.6'
+
+	testImplementation 'org.apache.commons:commons-lang3:3.11'
+
+	testRuntimeOnly(project(':jadx-plugins:jadx-dex-input'))
+	testRuntimeOnly(project(':jadx-plugins:jadx-smali-input'))
+	testRuntimeOnly(project(':jadx-plugins:jadx-java-convert'))
+}
+
+test {
+	exclude '**/tmp/*'
+}

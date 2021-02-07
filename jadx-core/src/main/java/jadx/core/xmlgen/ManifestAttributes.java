@@ -1,12 +1,11 @@
 package jadx.core.xmlgen;
 
-import jadx.core.utils.exceptions.JadxRuntimeException;
-
-import javax.xml.parsers.DocumentBuilder;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import javax.xml.parsers.DocumentBuilder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +13,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+
+import jadx.core.utils.exceptions.JadxRuntimeException;
 
 public class ManifestAttributes {
 	private static final Logger LOG = LoggerFactory.getLogger(ManifestAttributes.class);
@@ -43,7 +44,7 @@ public class ManifestAttributes {
 
 		@Override
 		public String toString() {
-			return "[" + type + ", " + values + "]";
+			return "[" + type + ", " + values + ']';
 		}
 	}
 
@@ -173,7 +174,7 @@ public class ManifestAttributes {
 			StringBuilder sb = new StringBuilder();
 			for (Map.Entry<Long, String> entry : attr.getValues().entrySet()) {
 				if (value == entry.getKey()) {
-					sb = new StringBuilder(entry.getValue() + "|");
+					sb = new StringBuilder(entry.getValue() + '|');
 					break;
 				} else if ((value & entry.getKey()) == entry.getKey()) {
 					sb.append(entry.getValue()).append('|');
